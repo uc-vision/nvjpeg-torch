@@ -1,14 +1,9 @@
-from setuptools import setup
+from setuptools import setup, Extension
 import os
 from torch.utils.cpp_extension import BuildExtension, CUDAExtension, CUDA_HOME
 
 
-nvjpeg_found = (
-    CUDA_HOME is not None and
-      os.path.exists(os.path.join(CUDA_HOME, 'include', 'nvjpeg.h'))
-)
-
-print('NVJPEG found: {0}'.format(nvjpeg_found))
+assert os.path.exists('/usr/src/jetson_multimedia_api'), "Jetson multimedia API not found"
 
 
 setup(
@@ -18,10 +13,18 @@ setup(
 
     ext_modules=[
         CUDAExtension('nvjpeg_cuda', 
-        [ 'nvjpeg_cuda.cpp' ],
-        libraries=['nvjpeg'])
-    ],
+          [ 'nvjpeg_cuda.cpp', 
+            '/usr/src/jetson_multimedia_api/samples/common/classes/NvJpegDecoder.cpp', '/usr/src/jetson_multimedia_api/samples/common/classes/NvJpegEncoder.cpp',
+            '/usr/src/jetson_multimedia_api/samples/common/classes/NvBuffer.cpp', '/usr/src/jetson_multimedia_api/samples/common/classes/NvElement.cpp',
+            '/usr/src/jetson_multimedia_api/samples/common/classes/NvLogging.cpp', '/usr/src/jetson_multimedia_api/samples/common/classes/NvElementProfiler.cpp',
+            '/usr/src/jetson_multimedia_api/argus/samples/utils/CUDAHelper.cpp'
+        ],
+        include_dirs=['/usr/src/jetson_multimedia_api/argus/samples/utils', '/usr/src/jetson_multimedia_api/include', '/usr/src/jetson_multimedia_api/include/libjpeg-8b'], 
 
+        define_macros=[('JPEGCODER_ARCH', 'jetson')],
+        library_dirs=['/usr/lib/aarch64-linux-gnu/tegra', 'build/lib'],
+        libraries=['cudart', 'nvjpeg', 'cuda'])
+    ],
 
     cmdclass={
         'build_ext': BuildExtension
