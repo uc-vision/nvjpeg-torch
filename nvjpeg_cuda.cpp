@@ -72,21 +72,18 @@ class JpegCoder {
     buffer.planes[1].data = static_cast<unsigned char*>(uv[0].data_ptr());
     buffer.planes[2].data = static_cast<unsigned char*>(uv[1].data_ptr());
 
-
     unsigned long out_buf_size = height * width * 3 / 2;
-    unsigned char *out_buf = new unsigned char[out_buf_size];
+    auto output = torch::empty({ static_cast<long int>(out_buf_size) }, torch::TensorOptions().dtype(torch::kUInt8));
 
 
-    int code = nv_encoder->encodeFromBuffer(buffer, JCS_YCbCr, &out_buf, out_buf_size, quality);
+
+    int code = nv_encoder->encodeFromBuffer(buffer, JCS_YCbCr, (unsigned char*)output.data_ptr(), out_buf_size, quality);
     if (0 != code){
         throw JpegException("Failed to encode jpeg", code);
     }
     
-    // return output.narrow(0, 0, out_buf_size);
-    auto output = torch::empty({ static_cast<long int>(out_buf_size) }, torch::TensorOptions().dtype(torch::kUInt8));
-    std::memcpy(output.data_ptr(), out_buf, out_buf_size);
+    return output.narrow(0, 0, out_buf_size);
 
-    return output;
   }
 
 

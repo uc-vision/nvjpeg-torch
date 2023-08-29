@@ -12,7 +12,14 @@ class Jpeg():
     self.jpeg = nvjpeg_cuda.Jpeg()
 
   @beartype
-  def encode_yuv(self, y:torch.Tensor, uv:torch.Tensor,  quality:int=90):
+  def encode_yuv_420(self, yuv:torch.Tensor,  quality:int=90):
+
+    height = yuv.shape[0] * 2 // 3
+    width = yuv.shape[1]
+
+    y = yuv[:height]
+    uv = yuv[height:].view(2, height//2, width//2)
+
     return self.jpeg.encode(y, uv, quality)
 
 

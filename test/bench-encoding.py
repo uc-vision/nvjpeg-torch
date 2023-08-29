@@ -25,18 +25,14 @@ class Timer:
         self.interval = self.end - self.start
 
 
-class CvJpeg(object):
-  def encode(self, image, quality):
-    result, compressed = cv2.imencode('.jpg', image, quality)
-
 
 class NvJpeg(object):
   def __init__(self):
     self.jpeg = Jpeg()
 
-  def encode(self, image, quality):
-    image = image.cuda()
-    compressed = self.jpeg.encode(image, quality)
+  def encode(self, image, quality=94):
+    # image = image.cuda()
+    compressed = self.jpeg.encode_yuv_420(image, quality)
 
 
 class Threaded(object):
@@ -63,7 +59,7 @@ class Threaded(object):
       item = self.queue.get()
 
 
-  def encode(self, image, quality=90):
+  def encode(self, image, quality=94):
     self.queue.put((image, quality))
 
 
@@ -77,21 +73,27 @@ class Threaded(object):
 
 
 
-def bench_threaded(create_encoder, images, threads):
+def bench_threaded(create_encoder, images, threads, warmup=100):
   threads = Threaded(create_encoder, threads)
+
+  for image in images[:warmup]:
+    threads.encode(image)
 
   with Timer() as t:
     for image in images:
       threads.encode(image)
 
     threads.stop()
-    torch.cuda.synchronize()
+    # torch.cuda.synchronize()
 
   return len(images) / t.interval
 
 
-def bench_encoder(create_encoder, images):
+def bench_encoder(create_encoder, images, warmup=20):
   encoder = create_encoder()
+
+  for image in images[:warmup]:
+    encoder.encode(image)
 
   with Timer() as t:
     for image in images:
@@ -102,31 +104,25 @@ def bench_encoder(create_encoder, images):
 
 def main(args):
   image = cv2.imread(args.filename, cv2.IMREAD_COLOR)
+  yuv_image = cv2.cvtColor(image, cv2.COLOR_BGR2YUV_I420)
 
-  images = [image] * args.n
+
   num_threads = args.j
 
 
+  yuv_images = [torch.from_numpy(yuv_image)] * args.n
+  print(f'nvjpeg (on cpu): {bench_threaded(NvJpeg, yuv_images, 4):>5.1f} images/s')
+
+  images = [image] * args.n
   print(f'turbojpeg threaded j={num_threads}: {bench_threaded(TurboJPEG, images, num_threads):>5.1f} images/s')
-
-
-  images = [torch.from_numpy(image)] * args.n
-  print(f'nvjpeg (on cpu): {bench_threaded(NvJpeg, images, 1):>5.1f} images/s')
-
-  images = [torch.from_numpy(image).pin_memory()] * args.n
-  print(f'nvjpeg (pinned): {bench_threaded(NvJpeg, images, 1):>5.1f} images/s')
-
-
-  images = [torch.from_numpy(image).cuda()] * args.n
-  print(f'nvjpeg (on gpu): {bench_threaded(NvJpeg, images, 1):>5.1f} images/s')
 
 
 if __name__=='__main__':
   parser = argparse.ArgumentParser(description='Jpeg encoding benchmark.')
   parser.add_argument('filename', type=str, help='filename of image to use')
 
-  parser.add_argument('-j', default=6, type=int, help='run multi-threaded')
-  parser.add_argument('-n', default=100, type=int, help='number of images to encode')
+  parser.add_argument('-j', default=8, type=int, help='run multi-threaded')
+  parser.add_argument('-n', default=400, type=int, help='number of images to encode')
 
   args = parser.parse_args()
   main(args)
