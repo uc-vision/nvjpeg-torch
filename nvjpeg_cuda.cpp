@@ -75,9 +75,9 @@ class JpegCoder {
     unsigned long out_buf_size = height * width * 3 / 2;
     auto output = torch::empty({ static_cast<long int>(out_buf_size) }, torch::TensorOptions().dtype(torch::kUInt8));
 
+    auto data = (unsigned char*)output.data_ptr();
 
-
-    int code = nv_encoder->encodeFromBuffer(buffer, JCS_YCbCr, (unsigned char*)output.data_ptr(), out_buf_size, quality);
+    int code = nv_encoder->encodeFromBuffer(buffer, JCS_YCbCr, &data, out_buf_size, quality);
     if (0 != code){
         throw JpegException("Failed to encode jpeg", code);
     }
